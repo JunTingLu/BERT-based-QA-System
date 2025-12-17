@@ -1,6 +1,6 @@
 # 🧠 Fine-Tuning LLM with BERT
 
-This project demonstrates how to fine-tune **BERT** on a custom **Question & Answer (QA)** dataset using **Google Colab with a T4 GPU**. It’s designed for engineers and researchers who want to build QA models quickly and efficiently without local GPU setup.
+This project demonstrates how to fine-tune **BERT base model** on a custom **ikala/tmmluplus Question & Answer (QA) dataset** dataset using **Google Colab with a T4 GPU**. It’s designed for engineers and researchers who want to build QA models quickly and efficiently without local GPU setup.
 
 This project frames the QA task as a Masked Language Modeling (MLM) problem, where the model learns to predict the answer by filling a `[MASK]` token.
 
@@ -27,81 +27,123 @@ This project frames the QA task as a Masked Language Modeling (MLM) problem, whe
 
 ---
 ## 📂 Project Structure
-```text
+
 ├── fine_tuning_llm_round1.ipynb # Main Jupyter notebook (data processing, training & evaluation)
-├── data/ # QA datasets (CSV / JSON)
-│   └── train.csv
+├── inference.py
 ├── models/ # Saved fine-tuned model
+├── test_qa_data.json # Test QA for inference.py
+├── requirements.txt # Required packages in inference.py
 └── README.md # Project documentation
-```
+
 ---
 ## DeepSpeed
 Fine-tune Bert-base-Chinese models efficiently using DeepSpeed, with support for ZeRO optimization and mixed precision.
+**DeepSpeed Configuration**
+```python
+config_params = {
+    "train_batch_size": 32,
+    "gradient_accumulation_steps": 1,
+    "optimizer": {
+        "type": "Adam",
+        "params": {
+            "lr": 1e-4,
+            "betas": [0.9, 0.999],
+            "eps": 1e-9,
+            "weight_decay": 3e-7
+        }
+    },
+    "scheduler": {
+        "type": "WarmupLR",
+        "params": {
+            "warmup_min_lr": 0,
+            "warmup_max_lr": 1e-5,
+            "warmup_num_steps": 100
+        }
+    },
+    "fp16": {
+        "enabled": False # Or False, if not using mixed precision (跟 colab T5 gpus 有關，有時 gradient scaling 沒設好，導致梯度很小 → 更新幅度幾乎 0)
+    },
+    "zero_optimization": {
+        "stage": 0 # Or 1, 2, 3 depending on your ZeRO optimization level
+    }
+}
+```
 
-### ⚡Setup
-1. **Create a Conda environment**:
+## ⚡Setup
+### 1. **Create a Conda environment**:
 ```bash
 conda create -n deepspeed_env python=3.12 -y
 conda activate deepspeed_env
-```
-2. **Install dependencies**
+``` 
+### 2. **Install dependencies**
   - Install PyTorch (choose the correct CUDA version from PyTorch website)
   - Install DeepSpeed and Transformers:
     ```bash
     pip install deepspeed transformers datasets
     ```
-3. **Dataset** 
-Make sure your dataset follows the format below (e.g. `data/train.csv`):
-```csv
-question,answer
-What is the capital of France?,Paris
-Who founded Microsoft?,Bill Gates
-```
+### 3. **Dataset**
+Code supports loading data from multiple domains of TMMLU+ dataset, including:<br>
+Medicine, law, finance, physics, chemistry, and 40+ professional domains, automatically splits into 70% / 25% / 5% for train/validation/test sets<br>
+and the dataset follows the format below:
+
+| question | A | B | C | D | answer |
+|---------|---|---|---|---|--------|
+| 依據行政罰法與學理之見解，關於行政罰之敘述，下列何者正確？ | 為避免行政機關執法困擾，行政罰法得類推適用刑法共犯制度之規定 | 個別法規有推定過失特別規定時，應優先於行政罰法責任條件之規定 | 對違反行政法上義務之行為，地方行政機關僅得依地方議會制定自治條例處罰 | 對同一違反義務行為，禁止同時科處行政罰並作成單純不利益行政處分 | B |
+
 ---
-4. **Fine-tuning**:
-Execute the `run_qa.py` script with DeepSpeed to start fine-tuning. The following command fine-tunes `bert-base-chinese` for 3 epochs.
+### 4. **Output Files**:
+- **Checkpoint Files (checkpoints/)**<br>
+    Model checkpoints saved during training, can be used to resume training.
+- **Fine-tuned Model (my_bert_finetuned_model_hf_format/)**
+  Automatically saved model and tokenizer after training, ready for inference.
+  Model Saving Features:
+  - ✅ ncludes complete model weights and tokenizer configuration
+  - ✅ Uses Hugging Face format, can be loaded with from_pretrained()
+  - ✅ Supports both DeepSpeed and standard PyTorch modes
+  - ✅ Code includes loading and inference functions
 
-```bash
-deepspeed --num_gpus=1 run_qa.py \
-    --model_name_or_path bert-base-chinese \
-    --train_file data/train.csv \
-    --output_dir models/bert-qa-chinese \
-    --num_train_epochs 3 \
-    --per_device_train_batch_size 2 \
-    --learning_rate 2e-5 \
-    --fp16
-``` 
-5. **Interact with the model**:
-After training, you can interact with the fine-tuned model using the `fill-mask` pipeline from Hugging Face Transformers. The model will predict the answer to your question by filling in the `[MASK]` token.
+- **Test Data (test_qa_data.json)** <br>
+  Structured Q&A data extracted from test set. Automatically saved to the project directory after data preparation.
+- **Loss Curve (validation_loss_curve.png)** <br>
+  Visualization chart of validation loss during training. Automatically saved to the project directory after training completes.
 
+--- 
+### 5 . **BERT Fine-Tuned Masked LM Inference Utility**:
+After training, this module provides a lightweight utility function for performing **masked token prediction** using a **fine-tuned BERT model** in **Masked Language Modeling (MLM)** mode. It is designed for **Chinese QA / text completion experiments**, where predictions are generated by filling the `[MASK]` token.
+
+- **Function Overview**
 ```python
-from transformers import pipeline
+chat_with_tuning_llm(prompt, top_k=200)
+```
+This function loads a fine-tuned BERT-base model, inserts a [MASK] token into the input prompt (if missing), and returns the Top-K candidate tokens predicted for the masked position.
 
-# Load the fine-tuned model from the output directory
-qa_pipeline = pipeline(
-    "fill-mask",
-    model="models/bert-qa-chinese",
-    tokenizer="models/bert-qa-chinese"
-)
+- **Example Usage**
+```
+  prompt = "行政罰法中，過失責任的判斷原則是"
+results = chat_with_tuning_llm(prompt, top_k=10)
 
-# Format the question for the fill-mask pipeline
-question = "What is the capital of France?"
-result = qa_pipeline(f"{question} [MASK]")
-
-# The top prediction is the answer
-print(f"Question: {question}")
-print(f"Answer: {result[0]['token_str']}")
+for token in results:
+    print(token)
+```
+Example Output:
+```
+推定
+應
+依
+原則
+行政
 ```
 
 ## 📊 Training Tips
 If the loss does not decrease:
-- Check if labels are aligned with the answers
+- Optimize the hyperparameters
 - Disable fp16 if you encounter unstable training
 - Ensure there are no missing or malformed rows in the dataset
 ---
 ## References
 - [DeepSpeed](https://www.deepspeed.ai)
 - [DeepSpeed introuduction](https://zhuanlan.zhihu.com/p/690690979)
+- [ikala/tmmluplus dataset](https://huggingface.co/datasets/ikala/tmmluplus/viewer/administrative_law?views%5B%5D=administrative_law_train&row=0)
 
 
 
