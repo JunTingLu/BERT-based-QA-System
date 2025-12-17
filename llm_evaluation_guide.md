@@ -1,8 +1,8 @@
-## 使用 Qwen 模型評估回答質量指南
+# 使用 Qwen 模型評估回答質量指南
 本專案使用 Qwen-3B 模型作為評估器（Judge），來比較微調後的 BERT 模型和原始模型的回答質量。這是一種 LLM-as-a-Judge 的評估方法。
 
 ---
-### 🎯 核心原理
+## 核心原理
 LLM-as-a-Judge 的核心思想是利用一個強大、中立的第三方大型語言模型（在此專案中為 Qwen），來自動化評估其他模型（微調前後的 BERT）的輸出品質。傳統上，這類評估需要大量的人力來進行主觀評分，而 LLM-as-a-Judge 提供了一種更快速、可擴展且成本較低的替代方案。
 
 評估者（Judge）模型會接收一個包含以下內容的提示（Prompt）：
@@ -14,7 +14,7 @@ LLM-as-a-Judge 的核心思想是利用一個強大、中立的第三方大型�
 然後，評估者模型會根據預設的標準（如正確性、相關性、完整性）對兩個模型的回答進行評分，並判斷哪一個更好。
 
 ---
-### 🔍 工作原理
+## 工作原理
 整個評估流程如下：
 1.  **生成基準測試集**：從 `ikala/tmmluplus` 資料集中隨機抽取問題，形成一個標準化的問答基準測試集 `qa_benchmark`。
 2.  **模型回答**：
@@ -25,7 +25,7 @@ LLM-as-a-Judge 的核心思想是利用一個強大、中立的第三方大型�
 5.  **獲取評估結果**：Qwen 模型會輸出對兩個模型回答的評分、質性評論，並宣告哪一個模型表現更優。
 
 ---
-### 代碼結構說明
+## 代碼結構說明
 專案主要由 `fine_tuning_llm_round1.ipynb` 構成，其關鍵組件如下：
 
 - **`generate_qa_benchmark()`**: 從 Hugging Face Hub 加載資料集，並隨機抽樣生成評估用的問答對。
@@ -39,7 +39,7 @@ LLM-as-a-Judge 的核心思想是利用一個強大、中立的第三方大型�
 - **主評估循環**: 遍歷 `qa_benchmark` 中的每一個問題，調用上述函數，最終輸出每個問題的評估報告。
 
 ---
-### prompt 設計
+## Prompt 設計
 為了引導評估者模型做出公正且結構化的評判，我們設計了以下的 Prompt 模板：
 
 ```python
@@ -62,13 +62,13 @@ Must give a score from 1-10 for each, and declare which is better:
 - **指令**: `Act as an impartial judge...` 這部分明確指示評估者模型扮演一個公正的角色，並根據具體標準進行評分。
 
 ---
-### 配置選項
+## 配置選項
 - **`model_name` (in `EvalLLm`)**: 評估者模型的名稱，預設為 `Qwen/Qwen2.5-3B-Instruct`。您可以將其更換為其他強大的模型，如 `gpt-4` 或 `claude-3-opus`。
 - **`config_params` (in notebook)**: DeepSpeed 的訓練配置，包括 `train_batch_size`, `lr` (學習率) 等，可根據硬體資源進行調整。
 - **`random_seed` (in `generate_qa_benchmark`)**: 用於確保每次生成的評估測試集都是相同的，以保證評估的可複現性。
 
 ---
-### 技術細節
+## 技術細節
 - **模型 A (基準模型)**: `bert-base-chinese`
 - **模型 B (微調模型)**: `bert-base-chinese` 在 `ikala/tmmluplus` 的部分資料上進行微調後的版本。
 - **評估者模型 (Judge Model)**: `Qwen/Qwen2.5-3B-Instruct`
@@ -78,7 +78,7 @@ Must give a score from 1-10 for each, and declare which is better:
     - `DeepSpeed`: 用於加速和優化模型訓練過程。
 
 ---
-### 評估標準
+## 評估標準
 評估者模型被要求從以下三個維度進行評分：
 1.  **正確性 (Correctness)**: 回答的內容是否事實準確？
 2.  **相關性 (Relevance)**: 回答是否直接針對問題？有沒有偏題？
@@ -87,7 +87,7 @@ Must give a score from 1-10 for each, and declare which is better:
 最終，評估者會為每個模型提供 1-10 分的評分，並給出一個總結性的判斷。
 
 ---
-### 參考資料
+## 參考資料
 - **LLM-as-a-Judge 論文**: [Judging LLM-as-a-judge with MT-Bench and Chatbot Arena](https://arxiv.org/abs/2306.05685)
 - **Qwen (通義千問) 模型**: [Hugging Face Model Page](https://huggingface.co/Qwen)
 - **DeepSpeed 官方網站**: [DeepSpeed Website](https://www.deepspeed.ai/)
