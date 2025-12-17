@@ -148,6 +148,3 @@ Each model receives a **score from 1 to 10**, followed by a final comparative ju
 
 - **Qwen Model (Tongyi Qianwen)**  
   https://huggingface.co/Qwen
-
-- **DeepSpeed Official Website**  
-  https://www.deepspeed.ai/
